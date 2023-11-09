@@ -59,7 +59,7 @@ require (
 )
 
 replace (
-	github.com/operator-framework/api => github.com/dtfranz/api v0.0.0-20231109073835-cdc1720a9152
+	github.com/operator-framework/api => github.com/operator-framework/api v0.19.1-0.20231109165736-6b3567d593e4
 	github.com/operator-framework/operator-registry => github.com/grokspawn/operator-registry v1.26.6-0.20231108225233-1c9bbc6d340a
 	google.golang.org/grpc => google.golang.org/grpc v1.40.0
 )

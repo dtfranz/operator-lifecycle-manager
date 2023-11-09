@@ -650,7 +650,7 @@ github.com/openshift/client-go/config/informers/externalversions/config/v1alpha1
 github.com/openshift/client-go/config/informers/externalversions/internalinterfaces
 github.com/openshift/client-go/config/listers/config/v1
 github.com/openshift/client-go/config/listers/config/v1alpha1
-# github.com/operator-framework/api v0.19.0 => github.com/dtfranz/api v0.0.0-20231109073835-cdc1720a9152
+# github.com/operator-framework/api v0.19.0 => github.com/operator-framework/api v0.19.1-0.20231109165736-6b3567d593e4
 ## explicit; go 1.19
 github.com/operator-framework/api/crds
 github.com/operator-framework/api/pkg/constraints
@@ -2207,7 +2207,7 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# github.com/operator-framework/api => github.com/dtfranz/api v0.0.0-20231109073835-cdc1720a9152
+# github.com/operator-framework/api => github.com/operator-framework/api v0.19.1-0.20231109165736-6b3567d593e4
 # github.com/operator-framework/operator-registry => github.com/grokspawn/operator-registry v1.26.6-0.20231108225233-1c9bbc6d340a
 # google.golang.org/grpc => google.golang.org/grpc v1.40.0
 # github.com/openshift/api => github.com/openshift/api v0.0.0-20221021112143-4226c2167e40
