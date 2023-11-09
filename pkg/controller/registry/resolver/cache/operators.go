@@ -148,9 +148,9 @@ func (i *OperatorSourceInfo) String() string {
 }
 
 type Deprecation struct {
-	*api.DeprecationEntry
-	Name string
+	*api.Deprecation
 	Type string // schema
+	Name string
 }
 
 type Entry struct {
