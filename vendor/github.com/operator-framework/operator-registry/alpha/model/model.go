@@ -17,7 +17,7 @@ import (
 )
 
 type Deprecation struct {
-	Message string
+	Message string `json:"message"`
 }
 
 func init() {
@@ -98,8 +98,8 @@ func (m *Package) Validate() error {
 }
 
 type Icon struct {
-	Data      []byte
-	MediaType string
+	Data      []byte `json:"base64data"`
+	MediaType string `json:"mediatype"`
 }
 
 func (i *Icon) Validate() error {

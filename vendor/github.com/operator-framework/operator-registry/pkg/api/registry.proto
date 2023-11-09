@@ -22,7 +22,7 @@ service Registry {
 message Channel{
 	string name = 1;
 	string csvName = 2;
-	DeprecationEntry deprecation = 3;
+	Deprecation deprecation = 3;
 }
 
 message PackageName{
@@ -33,7 +33,7 @@ message Package{
 	string name = 1;
 	repeated Channel channels = 2;
 	string defaultChannelName = 3;
-	DeprecationEntry deprecation = 4;
+	Deprecation deprecation = 4;
 }
 
 message GroupVersionKind{
@@ -68,7 +68,7 @@ message Bundle{
 	repeated Property properties = 12;
 	string replaces = 13;
 	repeated string skips = 14;
-	DeprecationEntry deprecation = 15;
+	Deprecation deprecation = 15;
 }
 
 message ChannelEntry{
@@ -128,6 +128,6 @@ message GetDefaultProviderRequest{
 	string plural = 4;
 }
 
-message DeprecationEntry{
+message Deprecation{
 	string message = 1;
 }
