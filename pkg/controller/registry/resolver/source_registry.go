@@ -10,6 +10,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/operator-framework/operator-lifecycle-manager/pkg/controller/registry"
 	"github.com/operator-framework/operator-lifecycle-manager/pkg/controller/registry/resolver/cache"
+	"github.com/operator-framework/operator-registry/alpha/declcfg"
 	"github.com/operator-framework/operator-registry/pkg/api"
 	"github.com/operator-framework/operator-registry/pkg/client"
 	opregistry "github.com/operator-framework/operator-registry/pkg/registry"
@@ -109,7 +110,7 @@ func (s *registrySource) Snapshot(ctx context.Context) (*cache.Snapshot, error) 
 	// Fetching default channels this way makes many round trips
 	// -- may need to either add a new API to fetch all at once,
 	// or embed the information into Bundle.
-	defaultChannels := make(map[string]string)
+	packages := make(map[string]*api.Package)
 
 	it, err := s.client.ListBundles(ctx)
 	if err != nil {
@@ -118,17 +119,28 @@ func (s *registrySource) Snapshot(ctx context.Context) (*cache.Snapshot, error) 
 
 	var operators []*cache.Entry
 	for b := it.Next(); b != nil; b = it.Next() {
-		defaultChannel, ok := defaultChannels[b.PackageName]
+		p, ok := packages[b.PackageName]
 		if !ok {
-			if p, err := s.client.GetPackage(ctx, b.PackageName); err != nil {
+			if p, err = s.client.GetPackage(ctx, b.PackageName); err != nil {
 				s.logger.Printf("failed to retrieve default channel for bundle, continuing: %v", err)
 				continue
 			} else {
-				defaultChannels[b.PackageName] = p.DefaultChannelName
-				defaultChannel = p.DefaultChannelName
+				packages[b.PackageName] = p
 			}
 		}
-		o, err := newOperatorFromBundle(b, "", s.key, defaultChannel)
+		var deprecations []cache.Deprecation
+		if p.Deprecation != nil {
+			deprecations = append(deprecations, cache.Deprecation{Deprecation: p.Deprecation, Name: b.PackageName, Type: declcfg.SchemaPackage})
+		}
+		for _, c := range p.Channels {
+			if c.Name == b.ChannelName && c.Deprecation != nil {
+				deprecations = append(deprecations, cache.Deprecation{Deprecation: c.Deprecation, Name: b.ChannelName, Type: declcfg.SchemaChannel})
+			}
+		}
+		if b.Deprecation != nil {
+			deprecations = append(deprecations, cache.Deprecation{Deprecation: b.Deprecation, Name: b.CsvName, Type: declcfg.SchemaBundle})
+		}
+		o, err := newOperatorFromBundle(b, "", s.key, p.DefaultChannelName)
 		if err != nil {
 			s.logger.Printf("failed to construct operator from bundle, continuing: %v", err)
 			continue
@@ -137,6 +149,9 @@ func (s *registrySource) Snapshot(ctx context.Context) (*cache.Snapshot, error) 
 		o.RequiredAPIs = o.RequiredAPIs.StripPlural()
 		o.Replaces = b.Replaces
 		EnsurePackageProperty(o, b.PackageName, b.Version)
+		if len(deprecations) > 0 {
+			o.Deprecations = deprecations
+		}
 		operators = append(operators, o)
 	}
 	if err := it.Error(); err != nil {
