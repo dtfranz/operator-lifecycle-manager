@@ -147,6 +147,12 @@ func (i *OperatorSourceInfo) String() string {
 	return fmt.Sprintf("%s/%s in %s/%s", i.Package, i.Channel, i.Catalog.Name, i.Catalog.Namespace)
 }
 
+type Deprecation struct {
+	*api.DeprecationEntry
+	Name string
+	Type string // schema
+}
+
 type Entry struct {
 	Name         string
 	Replaces     string
@@ -158,6 +164,9 @@ type Entry struct {
 	SourceInfo   *OperatorSourceInfo
 	Properties   []*api.Property
 	BundlePath   string
+	// Since there are separate cache entries for the same bundle in different channels,
+	// This should contain at most one deprecation for package, channel and bundle.
+	Deprecations []Deprecation
 
 	// Present exclusively to pipe inlined bundle
 	// content. Resolver components shouldn't need to read this,
