@@ -24,3 +24,22 @@ properties:
     value:
       packageName: packageA
       version: 1.0.1
+---
+schema: olm.deprecations
+package: packageA
+entries:
+  - reference:
+      schema: olm.package
+      name: packageA
+    message: |
+      packageA has been deprecated. Please switch to packageB.
+  - reference:
+      schema: olm.channel
+      name: stable
+    message: |
+      channel "stable" has been deprecated. Please switch to a different one.
+  - reference:
+      schema: olm.bundle
+      name: example-operator.v0.2.0
+    message: |
+      bundle "example-operator.v0.2.0" has been deprecated. Please switch to a different one.

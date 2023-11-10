@@ -2534,6 +2534,27 @@ var _ = Describe("Subscription", func() {
 				_, err = fetchSubscription(crc, generatedNamespace.GetName(), subName, subscriptionHasCurrentCSV("example-operator.v0.2.0"))
 				Expect(err).Should(BeNil())
 			})
+
+			It("should report deprecation conditions when package, channel, and bundle are referenced in an olm.deprecations object", func() {
+				By("patching the OperatorGroup to reduce the bundle unpacking timeout")
+				ogNN := types.NamespacedName{Name: operatorGroup.GetName(), Namespace: generatedNamespace.GetName()}
+				addBundleUnpackTimeoutOGAnnotation(context.Background(), ctx.Ctx().Client(), ogNN, "5m")
+
+				By("updating the catalog with a fixed v0.2.0 bundle image")
+				brokenProvider, err := NewFileBasedFiledBasedCatalogProvider(filepath.Join(testdataDir, subscriptionTestDataBaseDir, "example-operator.v0.2.0.yaml"))
+				Expect(err).To(BeNil())
+				err = magicCatalog.UpdateCatalog(context.Background(), brokenProvider)
+				Expect(err).To(BeNil())
+
+				By("waiting for the subscription to have v0.2.0 installed")
+				sub, err := fetchSubscription(crc, generatedNamespace.GetName(), subName, subscriptionHasCurrentCSV("example-operator.v0.2.0"))
+				Expect(err).Should(BeNil())
+
+				By("checking for the deprecated condition")
+				//TODO: Update this logic as the condition types change
+				cond := sub.Status.GetCondition(operatorsv1alpha1.SubscriptionOperatorDeprecated)
+				Expect(cond.Status).To(Equal(corev1.ConditionTrue))
+			})
 		})
 	})
 	When("bundle unpack retries are enabled", func() {
