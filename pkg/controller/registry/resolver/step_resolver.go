@@ -193,14 +193,32 @@ func (r *OperatorStepResolver) ResolveSteps(namespace string) ([]*v1alpha1.Step,
 			})
 		}
 
-		// add steps for subscriptions for bundles that were added through resolution
+		// add steps for subscriptions for bundles that were added through resolution and bundles that have been marked deprecated
 		for sub := range existingSubscriptions {
-			if sub.Status.CurrentCSV == op.Name {
-				continue
+			updated := false
+			if len(op.Deprecations) == 0 && corev1.ConditionStatus(sub.Status.GetCondition(v1alpha1.SubscriptionOperatorDeprecated).Type) != corev1.ConditionUnknown {
+				// If new bundle is no longer deprecated then remove the condition
+				sub.Status.RemoveConditions(v1alpha1.SubscriptionOperatorDeprecated)
+				updated = true
+			} else if len(op.Deprecations) > 0 {
+				// Remove old conditions first in case of update
+				sub.Status.RemoveConditions(v1alpha1.SubscriptionOperatorDeprecated)
+				for _, deprecation := range op.Deprecations {
+					sub.Status.SetCondition(v1alpha1.SubscriptionCondition{
+						Type:    v1alpha1.SubscriptionOperatorDeprecated,
+						Message: deprecation.Message,
+					})
+				}
+				updated = true
 			}
-			// update existing subscription status
-			sub.Status.CurrentCSV = op.Name
-			updatedSubs = append(updatedSubs, sub)
+			if sub.Status.CurrentCSV != op.Name {
+				// update existing subscription status with new bundle
+				sub.Status.CurrentCSV = op.Name
+				updated = true
+			}
+			if updated {
+				updatedSubs = append(updatedSubs, sub)
+			}
 		}
 	}
 
