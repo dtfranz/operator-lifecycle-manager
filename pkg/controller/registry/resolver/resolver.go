@@ -182,9 +182,10 @@ func (r *Resolver) Resolve(namespaces []string, subs []*v1alpha1.Subscription) (
 				DefaultChannel: op.SourceInfo.DefaultChannel,
 				Subscription:   op.SourceInfo.Subscription,
 			},
-			Properties: op.Properties,
-			BundlePath: op.BundlePath,
-			Bundle:     op.Bundle,
+			Properties:   op.Properties,
+			BundlePath:   op.BundlePath,
+			Bundle:       op.Bundle,
+			Deprecations: op.Deprecations,
 		}
 		if len(variableOperator.Replaces) > 0 {
 			op.Replaces = variableOperator.Replaces

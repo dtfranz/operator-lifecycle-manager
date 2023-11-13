@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1188,6 +1189,7 @@ func (o *Operator) syncResolvingNamespace(obj interface{}) error {
 	// TODO: parallel
 	maxGeneration := 0
 	subscriptionUpdated := false
+	subsSet := sets.New[types.NamespacedName]()
 	for i, sub := range subs {
 		logger := logger.WithFields(logrus.Fields{
 			"sub":     sub.GetName(),
@@ -1195,6 +1197,8 @@ func (o *Operator) syncResolvingNamespace(obj interface{}) error {
 			"pkg":     sub.Spec.Package,
 			"channel": sub.Spec.Channel,
 		})
+
+		subsSet.Insert(types.NamespacedName{Name: sub.Name, Namespace: sub.Namespace})
 
 		if sub.Status.InstallPlanGeneration > maxGeneration {
 			maxGeneration = sub.Status.InstallPlanGeneration
@@ -1348,8 +1352,32 @@ func (o *Operator) syncResolvingNamespace(obj interface{}) error {
 		}
 	}
 
+	newInstallPlanSubs := map[types.NamespacedName]*v1alpha1.Subscription{}
+	statusUpdatedSubs := map[types.NamespacedName]*v1alpha1.Subscription{}
+	// Split the updatedSubs into two groups:
+	// newInstallPlanSubs: Requires installplan creation
+	// statusUpdatedSubs:  Does not require installplan creation (status update only)
+	for _, updatedSub := range updatedSubs {
+		updatedSub.Status.RemoveConditions(v1alpha1.SubscriptionResolutionFailed)
+		nn := types.NamespacedName{Name: updatedSub.Name, Namespace: updatedSub.Namespace}
+		for _, sub := range subs {
+			if sub.Name == updatedSub.Name && sub.Namespace == updatedSub.Namespace {
+				if sub.Status.CurrentCSV != updatedSub.Status.CurrentCSV {
+					// subscription has a new installplan
+					newInstallPlanSubs[nn] = updatedSub
+				} else {
+					// only subscription status has been updated
+					statusUpdatedSubs[nn] = updatedSub
+				}
+				continue
+			}
+		}
+		// subscription is new and requires new installplan
+		newInstallPlanSubs[nn] = updatedSub
+	}
+
 	// create installplan if anything updated
-	if len(updatedSubs) > 0 {
+	if len(newInstallPlanSubs) > 0 {
 		logger.Info("resolution caused subscription changes, creating installplan")
 		// Finish calculating max generation by checking the existing installplans
 		installPlans, err := o.listInstallPlans(namespace)
@@ -1377,7 +1405,7 @@ func (o *Operator) syncResolvingNamespace(obj interface{}) error {
 			logger.WithError(err).Debug("error ensuring installplan")
 			return err
 		}
-		updatedSubs = o.setIPReference(updatedSubs, maxGeneration+1, installPlanReference)
+		newInstallPlanSubs = o.setIPReference(newInstallPlanSubs, maxGeneration+1, installPlanReference)
 	} else {
 		logger.Infof("no subscriptions were updated")
 	}
@@ -1393,21 +1421,22 @@ func (o *Operator) syncResolvingNamespace(obj interface{}) error {
 
 	// Remove resolutionfailed condition from subscriptions
 	o.removeSubsCond(subs, v1alpha1.SubscriptionResolutionFailed)
-	newSub := true
-	for _, updatedSub := range updatedSubs {
-		updatedSub.Status.RemoveConditions(v1alpha1.SubscriptionResolutionFailed)
-		for i, sub := range subs {
-			if sub.Name == updatedSub.Name && sub.Namespace == updatedSub.Namespace {
-				subs[i] = updatedSub
-				newSub = false
-				break
-			}
+
+	// Update existing subs
+	for i, sub := range subs {
+		nn := types.NamespacedName{Name: sub.Name, Namespace: sub.Namespace}
+		if updatedSub, ok := newInstallPlanSubs[nn]; ok {
+			subs[i] = updatedSub
+		} else if updatedSub, ok := statusUpdatedSubs[nn]; ok {
+			subs[i] = updatedSub
 		}
-		if newSub {
-			subs = append(subs, updatedSub)
-			continue
+	}
+	// Add new subs
+	for _, sub := range newInstallPlanSubs {
+		nn := types.NamespacedName{Name: sub.Name, Namespace: sub.Namespace}
+		if !subsSet.Has(nn) {
+			subs = append(subs, sub)
 		}
-		newSub = true
 	}
 
 	// Update subscriptions with all changes so far
@@ -1533,7 +1562,7 @@ func (o *Operator) ensureSubscriptionCSVState(logger *logrus.Entry, sub *v1alpha
 	return updatedSub, true, nil
 }
 
-func (o *Operator) setIPReference(subs []*v1alpha1.Subscription, gen int, installPlanRef *corev1.ObjectReference) []*v1alpha1.Subscription {
+func (o *Operator) setIPReference(subs map[types.NamespacedName]*v1alpha1.Subscription, gen int, installPlanRef *corev1.ObjectReference) map[types.NamespacedName]*v1alpha1.Subscription {
 	var (
 		lastUpdated = o.now()
 	)

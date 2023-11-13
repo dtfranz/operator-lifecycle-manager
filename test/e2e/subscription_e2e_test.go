@@ -2540,20 +2540,52 @@ var _ = Describe("Subscription", func() {
 				ogNN := types.NamespacedName{Name: operatorGroup.GetName(), Namespace: generatedNamespace.GetName()}
 				addBundleUnpackTimeoutOGAnnotation(context.Background(), ctx.Ctx().Client(), ogNN, "5m")
 
-				By("updating the catalog with a fixed v0.2.0 bundle image")
-				brokenProvider, err := NewFileBasedFiledBasedCatalogProvider(filepath.Join(testdataDir, subscriptionTestDataBaseDir, "example-operator.v0.2.0.yaml"))
+				By("updating the catalog with a fixed v0.2.0 bundle image marked deprecated")
+				provider, err := NewFileBasedFiledBasedCatalogProvider(filepath.Join(testdataDir, subscriptionTestDataBaseDir, "example-operator.v0.2.0-deprecations.yaml"))
 				Expect(err).To(BeNil())
-				err = magicCatalog.UpdateCatalog(context.Background(), brokenProvider)
+				err = magicCatalog.UpdateCatalog(context.Background(), provider)
 				Expect(err).To(BeNil())
 
 				By("waiting for the subscription to have v0.2.0 installed")
 				sub, err := fetchSubscription(crc, generatedNamespace.GetName(), subName, subscriptionHasCurrentCSV("example-operator.v0.2.0"))
 				Expect(err).Should(BeNil())
 
-				By("checking for the deprecated condition")
-				//TODO: Update this logic as the condition types change
-				cond := sub.Status.GetCondition(operatorsv1alpha1.SubscriptionOperatorDeprecated)
-				Expect(cond.Status).To(Equal(corev1.ConditionTrue))
+				By("checking for the deprecated conditions")
+				// Operators is deprecated at all three levels in the catalog
+				packageCondition := sub.Status.GetCondition(operatorsv1alpha1.SubscriptionPackageDeprecated)
+				Expect(packageCondition.Status).To(Equal(corev1.ConditionTrue))
+				channelCondition := sub.Status.GetCondition(operatorsv1alpha1.SubscriptionChannelDeprecated)
+				Expect(channelCondition.Status).To(Equal(corev1.ConditionTrue))
+				bundleCondition := sub.Status.GetCondition(operatorsv1alpha1.SubscriptionBundleDeprecated)
+				Expect(bundleCondition.Status).To(Equal(corev1.ConditionTrue))
+
+				By("verifying that a roll-up condition is present containing all deprecation conditions")
+				// Roll-up condition should be present and contain deprecation messages from all three levels
+				rollUpCondition := sub.Status.GetCondition(operatorsv1alpha1.SubscriptionDeprecated)
+				Expect(rollUpCondition.Status).To(Equal(corev1.ConditionTrue))
+				Expect(rollUpCondition.Message).To(ContainSubstring(packageCondition.Message))
+				Expect(rollUpCondition.Message).To(ContainSubstring(channelCondition.Message))
+				Expect(rollUpCondition.Message).To(ContainSubstring(bundleCondition.Message))
+
+				By("updating the catalog with a fixed v0.3.0 bundle image no longer marked deprecated")
+				provider, err = NewFileBasedFiledBasedCatalogProvider(filepath.Join(testdataDir, subscriptionTestDataBaseDir, "example-operator.v0.3.0.yaml"))
+				Expect(err).To(BeNil())
+				err = magicCatalog.UpdateCatalog(context.Background(), provider)
+				Expect(err).To(BeNil())
+
+				By("the subscription should no longer be marked deprecated")
+				Eventually(func() (bool, error) {
+					sub, err := fetchSubscription(crc, generatedNamespace.GetName(), subName, subscriptionHasCurrentCSV("example-operator.v0.3.0"))
+					if err != nil {
+						return false, err
+					}
+					cond := sub.Status.GetCondition(v1alpha1.SubscriptionDeprecated)
+					if cond.Status != corev1.ConditionUnknown {
+						return false, fmt.Errorf("%s condition found", v1alpha1.SubscriptionDeprecated)
+					}
+
+					return true, nil
+				}, 1*time.Minute, time.Second*10).Should(BeTrue())
 			})
 		})
 	})

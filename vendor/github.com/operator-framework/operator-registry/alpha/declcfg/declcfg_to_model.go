@@ -202,6 +202,7 @@ func ConvertToModel(cfg DeclarativeConfig) (model.Model, error) {
 			if references.Has(entry.Reference) {
 				return nil, fmt.Errorf("duplicate deprecation entry %#v for package %q", entry.Reference, deprecation.Package)
 			}
+			references.Insert(entry.Reference)
 
 			switch entry.Reference.Schema {
 			case SchemaBundle:

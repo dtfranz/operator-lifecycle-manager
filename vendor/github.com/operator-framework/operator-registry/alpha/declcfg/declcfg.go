@@ -19,7 +19,7 @@ const (
 	SchemaPackage     = "olm.package"
 	SchemaChannel     = "olm.channel"
 	SchemaBundle      = "olm.bundle"
-	SchemaDeprecation = "olm.catalog.deprecation"
+	SchemaDeprecation = "olm.deprecations"
 )
 
 type DeclarativeConfig struct {
